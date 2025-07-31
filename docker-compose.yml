@@ -1,0 +1,93 @@
+services:
+  go-app:
+    build: .
+    container_name: go-app
+    labels:
+      com.docker.compose.service: "lgtm-lab"
+    ports:
+      - "8080:8080"
+    networks:
+      - lgtm
+
+  promtail:
+    image: grafana/promtail:2.9.3
+    container_name: promtail
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on : 
+      - loki
+    networks:
+      - lgtm
+
+  loki:
+    image: grafana/loki:2.9.3
+    container_name: loki
+    volumes:
+      - ./loki-config.yml:/etc/loki/config.yml:ro,z
+      - loki-data:/loki:Z
+      - loki-wal:/wal:Z
+    command: -config.file=/etc/loki/config.yml
+    depends_on:
+      - minio
+    ports:
+      - "3100:3100"
+    networks:
+      - lgtm
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=200h'
+    ports:
+      - "9090:9090"
+    networks:
+      - lgtm
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+    volumes:
+      - ./datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro,z
+    depends_on:
+      - loki
+      - prometheus
+    ports:
+      - "3000:3000"
+    networks:
+      - lgtm
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=DUMMY_MINIO_ACCESS_KEY
+      - MINIO_ROOT_PASSWORD=DUMMY_MINIO_SECRET_KEY
+    volumes:
+      - minio-data:/data:z
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - lgtm
+
+volumes:
+  loki-data:
+  prometheus-data:
+  minio-data:
+  loki-wal:
+
+networks:
+  lgtm:
+    driver: bridge
