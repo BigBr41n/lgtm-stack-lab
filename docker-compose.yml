@@ -74,6 +74,23 @@ services:
     networks:
       - lgtm
 
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+        until mc alias set myminio http://minio:9000 DUMMY_MINIO_ACCESS_KEY DUMMY_MINIO_SECRET_KEY; do
+          echo 'Waiting for MinIO...';
+          sleep 2;
+        done &&
+        mc mb myminio/loki || true
+      "
+    networks:
+      - lgtm
+
+
   minio:
     image: minio/minio:latest
     container_name: minio
