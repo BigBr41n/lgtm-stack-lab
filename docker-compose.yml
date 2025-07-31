@@ -2,12 +2,17 @@ services:
   go-app:
     build: .
     container_name: go-app
-    labels:
-      com.docker.compose.service: "lgtm-lab"
     ports:
       - "8080:8080"
     networks:
       - lgtm
+    logging : 
+      driver : "json-file"
+      options: 
+        max-size: "10m"
+        max-file: "5"
+    labels: 
+      promtail: "true"
 
   promtail:
     image: grafana/promtail:2.9.3
@@ -15,27 +20,29 @@ services:
     volumes:
       - ./promtail-config.yml:/etc/promtail/config.yml
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro 
     command: -config.file=/etc/promtail/config.yml
     depends_on : 
       - loki
     networks:
       - lgtm
 
+
   loki:
     image: grafana/loki:2.9.3
     container_name: loki
+    user: "10001:10001"
     volumes:
-      - ./loki-config.yml:/etc/loki/config.yml:ro,z
-      - loki-data:/loki:Z
-      - loki-wal:/wal:Z
-    command: -config.file=/etc/loki/config.yml
-    depends_on:
-      - minio
+      - ./loki-config.yml:/etc/loki/config.yml:ro
+      - loki-data:/loki
+      - loki-wal:/wal
     ports:
       - "3100:3100"
+    depends_on:
+      - minio
     networks:
       - lgtm
+
 
   prometheus:
     image: prom/prometheus:latest
